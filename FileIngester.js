@@ -43,16 +43,28 @@ class ParserStream extends Transform {
         let buf = this.buf = Buffer.concat([this.buf, chunk]);
         while (true) {
             console.log(buf);
-            const len = buf.readInt16LE(0);
+            if(buf.length <= 0) {
+                this.push(null);
+                next();
+                return;
+            }
+
+            const len = buf.readUInt16BE(0);
             if(len < 4 || len > 1024) { buf = buf.slice(1); console.log("Invalid parse."); continue;}
             if(len > buf.length) {break;}
+
+            parsePacket(buf.slice(0, len));
+
+
             buf = buf.slice(len);
-            console.log(buf);
+            next();
+            return;
+            //console.log(buf);
         }
     }
 
-    flush(next) {
-
+    _flush(next) {
+        console.log("Flushed");
     }
 }
 
@@ -62,4 +74,29 @@ class DBwriter extends Writable {
 
     }
 
+}
+
+function parsePacket(buf) {
+    if(buf.length < 4) {return null;}
+    const len = buf.readUInt16BE(0);
+    const packetObj = {};
+
+    for(let head = 2; head < (len - 2); head) {
+        switch (buf[head]) {
+            case 0x01: //Time packet - len 5
+                packetObj.time = buf.readUInt32BE(head + 1);
+                head += 5;
+                break;
+            case 0x03: //Marker button - len 2
+                packetObj.marker = true;
+                head += 2;
+                break;
+            default:
+                console.log(`Unsupported sensor ID: ${buf[head]}`);
+                return null;
+        }
+
+    }
+    console.log(packetObj);
+    return packetObj;
 }
