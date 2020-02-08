@@ -2,13 +2,29 @@
 <html lang="en">
     <head>
         <title>kek</title>
+        <script src="main.js"></script>
     </head>
     <body>
-    <form action="/api/uploadRun/" method="post" enctype="multipart/form-data">
-        <input type="file" id="fSelect" name="run"><br>
-        <button type="submit">Upload</button>
-    </form>
-        <a href="/api/test">lel</a><br><br>
+        <form action="/api/uploadRun/" method="post" enctype="multipart/form-data">
+            <input type="file" id="fSelect" name="run"><br>
+            <button type="submit">Upload</button>
+        </form>
+        <br>
+        <br>
+        <div>
+            <label>
+                <input type="number" id="inputTimeMs">
+                Time - MS
+            </label>
+            <br>
+            <button id="btnRequestData">Request data</button>
+            <table id="dataTable"></table>
+        </div>
+
+        <br>
+        <br>
+        <a href="/api/test">API Test Page</a>
+
 
     </body>
 </html>

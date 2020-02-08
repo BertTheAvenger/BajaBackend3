@@ -2,6 +2,7 @@ const metaCollection = "runmeta";
 const fs = require("fs");
 const {Writable, Transform} = require("stream");
 const {parseBuffer, parsePacket} = require(rPath("PacketParser"));
+const {promisify} = require('util');
 
 const runCollection = "runs";
 const uploadDir = "uploads";
@@ -33,11 +34,11 @@ module.exports = class FileIngester {
         const rs = fs.createReadStream(rPath(uploadDir, file.filename));
         const bs = new DBWriter(this.db, runId);
         rs.pipe(ps).pipe(bs);
+        await new Promise(res => bs.on("finish", () => res()));
 
-        await bs.finished();
         console.log("Upload done.");
 
-        meta.updateOne({run: runId}, {$set: {completed: true}});
+        await meta.updateOne({run: runId}, {$set: {completed: true}});
 
 
     }
@@ -52,14 +53,18 @@ class ParserStream extends Transform {
 
     _transform(chunk, encoding, next) {
         this.buf = Buffer.concat([this.buf, chunk]);
-        let packets = parseBuffer(this.buf);
+        let {packets, buf} = parseBuffer(this.buf);
+        this.buf = buf;
         this.packetCount += packets.length;
-        packets.forEach(p => this.push(p));
+        //packets.forEach(p => this.push(p));
+        this.push(packets);
         next();
     }
 
     _flush(next) {
         console.log(`Parsed ${this.packetCount} packets.`);
+        this.push(null);
+        next(null);
         //console.log("Flushed");
     }
 }
@@ -76,24 +81,20 @@ class DBWriter extends Writable {
         this.insertPacket(packet).then(next);
     }
 
-    finished() {
-        const self = this;
-        return new Promise( (res, rej) => {
-            self.on("end", () => {res();})
-        });
-    }
-
-    async insertPacket(packet){
+    async insertPacket(packets){
         if(!this.runs) {
             this.runs = await this.db.collection("runs");
         }
+        const ops = packets.map(v => {
+           v.run = this.id;
+           return { insertOne : { "document" : v } }
+        });
 
-        packet.run = this.id;
 
-        await this.runs.insertOne(packet);
+        await this.runs.bulkWrite(ops);
     }
 
     _final(next) {
-
+        next();
     }
 }

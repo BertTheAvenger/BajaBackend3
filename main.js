@@ -4,6 +4,7 @@ global["rPath"] = (...arg) => path.join(__dirname, ...arg);
 const express = require('express');
 const fs = require("fs");
 const {promisify} = require('util');
+const bodyParser = require('body-parser');
 const MongoClient = require('mongodb').MongoClient;
 
 
@@ -57,8 +58,8 @@ async function setupDb() {
     db = await mongoclient.db(dbName);
 
     try {
-        await db.dropCollection("runs");
-        await db.dropCollection("runmeta");
+        //await db.dropCollection("runs");
+        //await db.dropCollection("runmeta");
     } catch (e) {}
 
 
@@ -69,7 +70,7 @@ async function setupDb() {
     runs.createIndex({run: 1, time: 1});
 
     //Clean up runs - make the realtime static + complete, and delete uncompleted ingests.
-    await runmeta.updateOne({realTime: true}, {$set : {realTime: false, completed: true}});
+    await runmeta.updateMany({realTime: true}, {$set : {realTime: false, completed: true}});
 
     //Clean out any runs that failed to fully parse.
     const uncompleted = await runmeta.find({completed: false}).toArray();
@@ -77,7 +78,7 @@ async function setupDb() {
         console.log(`Deleting ${uncompleted.length} incomplete runs.`);
         for(const v of uncompleted) {
             await db.collection("runmeta").deleteOne({run: v.run});
-            await db.collection("runs").deleteOne({run: v.run});
+            await db.collection("runs").removeMany({run: v.run});
         }
     }
 
@@ -96,6 +97,8 @@ async function setupDb() {
 async function setupServer() {
     const apiPath = rPath("public/api/");
     app = express();
+    app.use(express.json());
+
 
     /*Register all express API listeners.*/
     //This "one-liner" just loops through all JS in the api folder,
@@ -110,7 +113,9 @@ async function setupServer() {
 
 
     //Register statics
+
     app.use(express.static("public/www/"));
+
 
 
     //Register the error page last.

@@ -56,7 +56,7 @@ function parseBuffer(buf) {
 
         buf = buf.slice(len);
     }
-    return packets;
+    return {packets, buf};
 }
 
 module.exports = {parseBuffer, parsePacket};
