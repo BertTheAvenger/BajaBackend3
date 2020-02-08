@@ -30,7 +30,9 @@ let app = null; //Keep a global reference to the express server.
 /*Immediately invoke an async func to start everything up*/
 (async () => {
     //Delete any previously uploaded files B/C they probably didn't finish.
-    fs.readdirSync(rPath(uploadDir)).forEach(v => fs.unlinkSync(rPath(uploadDir, v)));
+    if(fs.existsSync(rPath(uploadDir))) {
+        fs.readdirSync(rPath(uploadDir)).forEach(v => fs.unlinkSync(rPath(uploadDir, v)));
+    }
 
     await setupDb();
 
@@ -52,19 +54,30 @@ let app = null; //Keep a global reference to the express server.
 async function setupDb() {
     console.log("Connecting to DB...");
     await mongoclient.connect();
-    db = mongoclient.db(dbName);
+    db = await mongoclient.db(dbName);
+
+    try {
+        await db.dropCollection("runs");
+        await db.dropCollection("runmeta");
+    } catch (e) {}
+
+
 
     const runmeta = await db.collection("runmeta");
     const runs = await db.collection("runs");
+
+    runs.createIndex({run: 1, time: 1});
+
     //Clean up runs - make the realtime static + complete, and delete uncompleted ingests.
     await runmeta.updateOne({realTime: true}, {$set : {realTime: false, completed: true}});
 
+    //Clean out any runs that failed to fully parse.
     const uncompleted = await runmeta.find({completed: false}).toArray();
     if(uncompleted) {
         console.log(`Deleting ${uncompleted.length} incomplete runs.`);
         for(const v of uncompleted) {
-            await db.collection("runmeta").deleteOne({runId: v.runId});
-            await db.collection("runs").deleteOne({runId: v.runId});
+            await db.collection("runmeta").deleteOne({run: v.run});
+            await db.collection("runs").deleteOne({run: v.run});
         }
     }
 

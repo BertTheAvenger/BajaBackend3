@@ -1,6 +1,8 @@
 const metaCollection = "runmeta";
 const fs = require("fs");
 const {Writable, Transform} = require("stream");
+const {parseBuffer, parsePacket} = require(rPath("PacketParser"));
+
 const runCollection = "runs";
 const uploadDir = "uploads";
 
@@ -17,86 +19,81 @@ module.exports = class FileIngester {
             return;
         }
         const meta = await this.db.collection(metaCollection);
+        if((await meta.find({size: file.size}, {fileName: file.originalname}).toArray()).length > 0) {console.log("File already exists!"); return;}
         await meta.insertOne({
-                                 runId: runId,
+                                 run: runId,
                                  size: file.size,
                                  fileName: file.originalname,
                                  realTime: false,
                                  completed: false,
                                  timeIngested: Date.now()
                              });
+
         const ps = new ParserStream();
         const rs = fs.createReadStream(rPath(uploadDir, file.filename));
-        rs.pipe(ps);
+        const bs = new DBWriter(this.db, runId);
+        rs.pipe(ps).pipe(bs);
+
+        await bs.finished();
+        console.log("Upload done.");
+
+        meta.updateOne({run: runId}, {$set: {completed: true}});
+
 
     }
-
 };
 
 class ParserStream extends Transform {
     constructor() {
-        super();
+        super({objectMode: true});
         this.buf = Buffer.from([]); //Empty buffer.
+        this.packetCount = 0;
     }
 
     _transform(chunk, encoding, next) {
-        let buf = this.buf = Buffer.concat([this.buf, chunk]);
-        while (true) {
-            console.log(buf);
-            if(buf.length <= 0) {
-                this.push(null);
-                next();
-                return;
-            }
-
-            const len = buf.readUInt16BE(0);
-            if(len < 4 || len > 1024) { buf = buf.slice(1); console.log("Invalid parse."); continue;}
-            if(len > buf.length) {break;}
-
-            parsePacket(buf.slice(0, len));
-
-
-            buf = buf.slice(len);
-            next();
-            return;
-            //console.log(buf);
-        }
+        this.buf = Buffer.concat([this.buf, chunk]);
+        let packets = parseBuffer(this.buf);
+        this.packetCount += packets.length;
+        packets.forEach(p => this.push(p));
+        next();
     }
 
     _flush(next) {
-        console.log("Flushed");
+        console.log(`Parsed ${this.packetCount} packets.`);
+        //console.log("Flushed");
     }
 }
 
-class DBwriter extends Writable {
-    constructor() {
-        super();
-
+class DBWriter extends Writable {
+    constructor(database, id) {
+        super({objectMode: true});
+        this.db = database;
+        this.runs = null;
+        this.id = id;
     }
 
-}
+    _write(packet, encoding, next) {
+        this.insertPacket(packet).then(next);
+    }
 
-function parsePacket(buf) {
-    if(buf.length < 4) {return null;}
-    const len = buf.readUInt16BE(0);
-    const packetObj = {};
+    finished() {
+        const self = this;
+        return new Promise( (res, rej) => {
+            self.on("end", () => {res();})
+        });
+    }
 
-    for(let head = 2; head < (len - 2); head) {
-        switch (buf[head]) {
-            case 0x01: //Time packet - len 5
-                packetObj.time = buf.readUInt32BE(head + 1);
-                head += 5;
-                break;
-            case 0x03: //Marker button - len 2
-                packetObj.marker = true;
-                head += 2;
-                break;
-            default:
-                console.log(`Unsupported sensor ID: ${buf[head]}`);
-                return null;
+    async insertPacket(packet){
+        if(!this.runs) {
+            this.runs = await this.db.collection("runs");
         }
 
+        packet.run = this.id;
+
+        await this.runs.insertOne(packet);
     }
-    console.log(packetObj);
-    return packetObj;
+
+    _final(next) {
+
+    }
 }
