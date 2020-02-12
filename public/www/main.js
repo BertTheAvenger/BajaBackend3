@@ -1,4 +1,6 @@
 let url = "/api/getdatapoint/";
+let url2 = "/api/getdatapoints/";
+
 
 window.onload = () => {
     document.getElementById("btnRequestData").onclick = () => {
@@ -6,7 +8,7 @@ window.onload = () => {
 
 
 
-        xhr.open("POST", url, true);
+        xhr.open("POST", url2, true);
         xhr.setRequestHeader("Content-Type", "application/json");
         xhr.onreadystatechange = function () {
             if (xhr.readyState === 4 && xhr.status === 200) {
@@ -15,7 +17,7 @@ window.onload = () => {
             }
         };
 
-        let data = JSON.stringify({time: document.getElementById("inputTimeMs").value} );
+        let data = JSON.stringify({times: document.getElementById("inputTimeMs").value} );
         xhr.send(data);
     };
 

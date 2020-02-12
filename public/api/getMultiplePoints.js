@@ -2,23 +2,26 @@
 let db;
 module.exports = (app, dbClient) => {
     db = dbClient;
-    app.post("/api/getdatapoint/", async (req, res, next) => {
+    app.post("/api/getmultipledatapoint/", async (req, res, next) => {
         console.log(req.body);
-        if(!(req.body && req.body.time && req.body.run)) {res.status(400)}
+        if(!(req.body && req.body.times && req.body.run)) {res.status(400)}
 
-        const time = Number(req.body.time);
-        const query = await reqToQuery(req.body.time, req.body.run, req.body.range);
-        let data = await db.collection("runs").find(query).toArray();
-        let toSend = data[0];
+        const runs = await db.collection("runs");
 
-        if(toSend) {
+        const times = req.times.map(v => Number(v));
+
+        const points = await runs.find({run: req.body.run, time: {$in : times}});
+        console.log(points);
+
+        res.status(200);
+        /*if(toSend) {
             delete toSend._id;
             console.log(toSend);
             res.status(200).json(toSend);
         } else {
             res.status(200).json({});
         }
-
+*/
 
     });
 };
@@ -29,4 +32,9 @@ async function reqToQuery(time, run, range = 0.5){
         time : {$lt : time + range, $gt : time - range},
         run : run,
     }
+}
+
+function checkValidity() {
+
+
 }
