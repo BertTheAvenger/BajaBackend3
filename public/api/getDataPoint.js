@@ -1,4 +1,3 @@
-
 let db;
 module.exports = (app, dbClient) => {
     db = dbClient;

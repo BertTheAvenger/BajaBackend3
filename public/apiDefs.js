@@ -1,22 +1,36 @@
-const validate = require("validate");
+import Schema from 'validate'
 
-const apiDef = {
-    multiplePoints : {
-        path : "/api/getmultiplepoints/",
-        schema: {
-
+const multiplePointsDef = {
+    path: "/api/getmultiplepoints/",
+    schema: new Schema({
+        times: {
+            type: Array,
+            required: true,
+            each: {type: Number}
         },
-        handler : (req, res, dbClient) => {res.status(200).send("kk")}
-    },
-    singlePoint : {
+        range: {
+            type: Number,
+            required: false,
+        },
+
+    }),
+    handler: (req, res, dbClient) => {
+        res.status(200).send("kk");
+    }
+};
+
+const singlePoints = {
+    singlePoint: {
         path: "/api/getpoint/",
         schema: {
             time: "number;required",
-            range:"number;optional=0.5"
+            range: "number;optional=0.5"
         },
-        handler : (req, res, dbClient) => {res.status(200).send("kk")}
+        handler: (req, res, dbClient) => {res.status(200).send("kk")}
     }
 };
+
+const apiDef = {};
 
 function bodyVerifier(structure, body) {
 
