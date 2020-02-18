@@ -25,16 +25,3 @@ module.exports = (app, dbClient) => {
 
     });
 };
-
-async function reqToQuery(time, run, range = 0.5){
-    if(!run || !time) {return null;}
-    return {
-        time : {$lt : time + range, $gt : time - range},
-        run : run,
-    }
-}
-
-function checkValidity() {
-
-
-}

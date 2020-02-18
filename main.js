@@ -20,10 +20,6 @@ const port = 80;
 const uploadDir = "uploads";
 
 let app = null; //Keep a global reference to the express server.
-let dbDriver = null;
-
-
-
 
 
 
@@ -34,9 +30,11 @@ let dbDriver = null;
         fs.readdirSync(rPath(uploadDir)).forEach(v => fs.unlinkSync(rPath(uploadDir, v)));
     }
 
-    dbDriver = await new DBDriver(mongoclient);
+    await dbDriver.intialize();
 
     await setupServer();
+
+    await dbDriver.getData("00885f09d5c9a096ef1f85079a76d64e", 866);
 
 
     console.log(`CP Baja server started on port ${port}!`);

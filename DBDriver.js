@@ -10,26 +10,53 @@ class DBDriver extends MongoClient{
     }
 
     async intialize(...args) {
-        super.connect(...args);
+        await super.connect(...args);
 
         //get the various collections
         this.DB = await this.db(dbName);
         this.runs = await this.DB.collection(runCollection);
         this.meta = await this.DB.collection(metaCollection);
 
+        console.log("Got Collections");
         //Update each "realtime" run to be static/permanent
         await this.meta.updateMany({realTime: true}, {$set : {realTime: false, completed: true}});
 
+        console.log("Updated Runs");
         //Delete uncompleted runs - those which started to be uploaded but never finished.
         const uncompleted = await this.meta.find({completed: false}).toArray();
         if(uncompleted) {
             console.log(`Deleting ${uncompleted.length} incomplete runs.`);
             for(const v of uncompleted) {
-                await this.meta.deleteOne({run: v.run});
-                await this.runs.removeMany({run: v.run});
+                await this.deleteRun(v.run);
             }
         }
+        console.log("Deleted incomplete");
     }
+
+
+    async getData(runId, times, range = .5) {
+        times = times instanceof Array ? times : [times]; //Ensure times is an array, even when passed time num.
+
+        let timeQueries = times.map(time => ( {time: {$gt : time - range, $lt : time + range}} ));
+
+        console.log(timeQueries);
+        const points = await this.runs.find({
+            run: runId,
+            $or: timeQueries,
+        });
+        console.log(await points.toArray());
+
+    }
+
+    async createRun(runInfo) {
+
+    }
+
+    async deleteRun(runId) {
+        await this.meta.deleteOne({run: runId});
+        await this.runs.removeMany({run: runId});
+    }
+
 
 }
 
