@@ -1,0 +1,47 @@
+{
+  "1": {
+    "name": "time",
+    "description": "Keeps track of when readings were taken, in MS.",
+    "comment": "Used as main access for data in DB.",
+    "size": 5,
+    "updating": false,
+    "format": {
+      "time": [1, "uint32_t"]
+    }
+  },
+  "3": {
+    "name": "markerButton",
+    "description": "Indicates when the marker button is pushed by the driver.",
+    "comment": "Only exists when the marker button is pressed.",
+    "size": 2,
+    "updating": true,
+    "format": {
+      "marker": [1, "bool"]
+    }
+  },
+  "4": {
+    "name": "rotationSpeeds",
+    "description": "Contains data for rotational speed sensors like wheels and engine.",
+    "comment": "",
+    "size": 9,
+    "updating": false,
+    "format": {
+      "engineSpeed": [1, "uint16_t"],
+      "rearWheelSpeed": [3, "uint16_t"],
+      "frontLeftWheelSpeed": [5, "uint16_t"],
+      "frontRightWheelSpeed": [7, "uint16_t"]
+    }
+
+  },
+  "5": {
+    "name": "brakePressure",
+    "description": "Contains data for L and R brake systems.",
+    "comment": "",
+    "size": 5,
+    "updating": false,
+    "format": {
+        "rearBrakePressure" : [1, "uint16_t"],
+        "frontBrakePressure" : [3, "uint16_t"]
+    }
+  }
+}

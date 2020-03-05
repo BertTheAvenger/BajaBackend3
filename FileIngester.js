@@ -1,16 +1,17 @@
-const metaCollection = "runmeta";
-const fs = require("fs");
-const {Writable, Transform} = require("stream");
-const {parseBuffer, parsePacket} = require(rPath("PacketParser"));
-const {promisify} = require('util');
+const cliProgress = require('cli-progress');
 
-const runCollection = "runs";
+
+const fs = require("fs");
+const {Writable} = require("stream");
+const {ParserStream} = require(rPath("PacketParser"));
+
 const uploadDir = "uploads";
 
 module.exports = class FileIngester {
     constructor(file, database) {
         this.file = file;
         this.db = database;
+
     }
 
     async run(file = this.file) {
@@ -19,20 +20,24 @@ module.exports = class FileIngester {
             console.error("TRIED TO INGEST NONEXISTANT FILE!");
             return;
         }
-        const meta = await this.db.collection(metaCollection);
-        if((await meta.find({size: file.size}, {fileName: file.originalname}).toArray()).length > 0) {console.log("File already exists!"); return;}
+        const meta = await this.db.meta;
+        if ((await meta.find({size: file.size}, {fileName: file.originalname}).toArray()).length > 0) {
+            console.log("File already exists!");
+            return;
+        }
         await meta.insertOne({
-                                 run: runId,
-                                 size: file.size,
-                                 fileName: file.originalname,
-                                 realTime: false,
-                                 completed: false,
-                                 timeIngested: Date.now()
-                             });
+            run: runId,
+            size: file.size,
+            fileName: file.originalname,
+            realTime: false,
+            completed: false,
+            timeIngested: Date.now()
+        });
 
-        const ps = new ParserStream();
+        const ps = new ParserStream(file.size);
         const rs = fs.createReadStream(rPath(uploadDir, file.filename));
-        const bs = new DBWriter(this.db, runId);
+        const bs = new DBWriter(this.db, runId, file.size);
+
         rs.pipe(ps).pipe(bs);
         await new Promise(res => bs.on("finish", () => res()));
 
@@ -44,57 +49,39 @@ module.exports = class FileIngester {
     }
 };
 
-class ParserStream extends Transform {
-    constructor() {
-        super({objectMode: true});
-        this.buf = Buffer.from([]); //Empty buffer.
-        this.packetCount = 0;
-    }
-
-    _transform(chunk, encoding, next) {
-        this.buf = Buffer.concat([this.buf, chunk]);
-        let {packets, buf} = parseBuffer(this.buf);
-        this.buf = buf;
-        this.packetCount += packets.length;
-        //packets.forEach(p => this.push(p));
-        this.push(packets);
-        next();
-    }
-
-    _flush(next) {
-        console.log(`Parsed ${this.packetCount} packets.`);
-        this.push(null);
-        next(null);
-        //console.log("Flushed");
-    }
-}
-
 class DBWriter extends Writable {
-    constructor(database, id) {
+    constructor(database, id, totalSize) {
         super({objectMode: true});
         this.db = database;
         this.runs = null;
         this.id = id;
+
+        this.loadBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+        this.loadBar.start(totalSize, 0);
     }
 
-    _write(packet, encoding, next) {
-        this.insertPacket(packet).then(next);
+    _write(packets, encoding, next) {
+        this.insertPackets(packets).then(next);
     }
 
-    async insertPacket(packets){
-        if(!this.runs) {
-            this.runs = await this.db.collection("runs");
+    async insertPackets(packets) {
+        if (!this.runs) {
+            this.runs = await this.db.runs;
         }
+        let bytes = 0;
         const ops = packets.map(v => {
-           v.run = this.id;
-           return { insertOne : { "document" : v } }
+            bytes += v.size;
+            v.run = this.id;
+            return {insertOne: {"document": v}}
         });
 
 
         await this.runs.bulkWrite(ops);
+        this.loadBar.increment(bytes);
     }
 
     _final(next) {
+        this.loadBar.stop();
         next();
     }
 }

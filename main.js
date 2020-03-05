@@ -4,9 +4,8 @@ global["rPath"] = (...arg) => path.join(__dirname, ...arg);
 const express = require('express');
 const fs = require("fs");
 const {promisify} = require('util');
-const bodyParser = require('body-parser');
-
 const DBDriver = require("./DBDriver");
+const api = require("./public/api/apiDefs");
 
 
 
@@ -30,7 +29,7 @@ let app = null; //Keep a global reference to the express server.
         fs.readdirSync(rPath(uploadDir)).forEach(v => fs.unlinkSync(rPath(uploadDir, v)));
     }
 
-    await dbDriver.intialize();
+    await dbDriver.initialize();
 
     await setupServer();
 
@@ -49,34 +48,26 @@ let app = null; //Keep a global reference to the express server.
 async function setupServer() {
     const apiPath = rPath("public/api/");
     app = express();
+
+    //Use the JSON middleware for ez clap JSON parsing.
     app.use(express.json());
 
+    /*Register all API definitions from apiDefs.js.*/
 
-    /*Register all express API listeners.*/
-    //This "one-liner" just loops through all JS in the api folder,
-    // requires it with the express app and DB, and counts
-    // how many it went through.
-/*
-    let numRegistered = fs.readdirSync("public/api")
-                          .reduce((count, v) => {
-                              require(apiPath + v)(app, db);
-                              return count+1;
-                          }, 0);
-    console.log(`Registered ${numRegistered} express API handlers.`);
+    for(let def of api) {
+        def.intermediates = def.intermediates instanceof Array ? def.intermediates : [];
+        app[def.method](def.path, ...def.intermediates, (...arg) => def.handler(dbDriver, ...arg));
+    }
 
-*/
-
-    //Register statics
-
+    /*Setup static server*/
     app.use(express.static("public/www/"));
-
-
 
     //Register the error page last.
     app.get('*', function(req, res){
         res.status(404).sendFile("public/www/err/404.html", {root: __dirname});
     });
 
+    //Finally, start the server up.
     console.log("Starting express server...");
     await promisify(app.listen.bind(app))(port);
     console.log("Express server started.");

@@ -2,7 +2,7 @@
 function parsePacket(buf) {
     if(buf.length < 4) {return null;}
     const len = buf.readUInt16BE(0);
-    const packetObj = {};
+    const packetObj = {size: buf.length};
 
     for(let head = 2; head < (len - 2); head) {
         switch (buf[head]) {
@@ -53,10 +53,37 @@ function parseBuffer(buf) {
         if(!packetObj) {buf = buf.slice(1); console.log("Invalid Packet."); continue;}
 
         packets.push(packetObj);
-
         buf = buf.slice(len);
     }
     return {packets, buf};
 }
 
-module.exports = {parseBuffer, parsePacket};
+
+class ParserStream extends require("stream").Transform {
+    constructor(totalSize) {
+        super({objectMode: true});
+        this.buf = Buffer.from([]); //Empty buffer.
+    }
+
+    _transform(chunk, encoding, next) {
+        this.buf = Buffer.concat([this.buf, chunk]);
+        let {packets, buf} = parseBuffer(this.buf);
+        this.buf = buf;
+        this.push(packets);
+
+        next();
+    }
+}
+
+class ArraySeparator extends require("stream").Transform {
+    constructor(totalSize) {
+        super({objectMode: true});
+    }
+
+    _transform(arr, encoding, next) {
+        arr.forEach(v => this.push(v));
+        next();
+    }
+}
+
+module.exports = {parseBuffer, parsePacket, ParserStream, ArraySeparator};
