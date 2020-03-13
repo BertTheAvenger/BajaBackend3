@@ -9,6 +9,11 @@ class DBDriver extends MongoClient {
         super(...args);
     }
 
+    async getRun(runId) {
+
+    }
+
+
     async initialize(...args) {
         await super.connect(...args);
 
@@ -24,15 +29,17 @@ class DBDriver extends MongoClient {
         */
 
         console.log("Got Collections");
+
         //Update each "realtime" run to be static/permanent
         await this.meta.updateMany({realTime: true}, {$set: {realTime: false, completed: true}});
 
         this.runs.createIndex({run: -1, time: -1});
         console.log("Updated Runs");
+
         //Delete uncompleted runs - those which started to be uploaded but never finished.
         const uncompleted = await this.meta.find({completed: false}).toArray();
         if (uncompleted.length > 0) {
-            console.log(`Deleting ${uncompleted.length} incomplete runs.`);
+            console.log(`Dele3ting ${uncompleted.length} incomplete runs.`);
             for (const v of uncompleted) {
                 await this.deleteRun(v.run);
             }
@@ -64,6 +71,24 @@ class DBDriver extends MongoClient {
         await this.meta.deleteOne({run: runId});
         await this.runs.removeMany({run: runId});
     }
+
+    async uploadRun(){
+
+
+    }
+
+
+}
+
+class DbRun {
+    constructor(dbDriver, runId) {
+        this.runId = runId;
+    }
+
+    populate(runId) {
+
+    }
+
 
 
 }

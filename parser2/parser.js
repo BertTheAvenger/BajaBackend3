@@ -88,10 +88,10 @@ class CSVTransform extends stream.Transform {
     }
     _transform(packetObj, encoding, next) {
         if(!this.initialized) {
-            this.push(Object.keys(packetObj).reduce((acc, key) => acc + `${key}, `, "") + "\n");
+            this.push(Object.keys(packetObj).reduce((acc, key) => acc + `${key},`, "") + "\n");
             this.initialized = true;
         }
-        const str = Object.values(packetObj).reduce((acc, val) => acc + `${val ? val : ""}, `, "") + "\n";
+        const str = Object.values(packetObj).reduce((acc, val) => acc + `${val ? val : ""},`, "") + "\n";
         this.push(str);
         next();
     }
@@ -101,8 +101,10 @@ class CSVTransform extends stream.Transform {
 let modules = fs.readdirSync("./sensorModules").map(v => require(__dirname + "\\sensorModules\\" + v));
 let indexedModules = [];
 modules.forEach(v => indexedModules[v.id] = v); //Map the modules to the sparse array.
-let rs = fs.createReadStream("../testFiles/D11.bin");
+let rs = fs.createReadStream("../testFiles/D15.bin");
 let csv = new CSVTransform(indexedModules);
 let p2 = new parser2(indexedModules);
 
-rs.pipe(p2).pipe(csv).pipe(fs.createWriteStream("test.csv"));
+rs.pipe(p2).pipe(csv).pipe(fs.createWriteStream("test.csv"))
+
+module.exports = {CSVTransform, parser2};
